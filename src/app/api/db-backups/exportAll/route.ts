@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
       const tarPath = zipPath.replace(".zip", ".tar.gz");
       execFileSync("tar", ["-czf", tarPath, "-C", path.dirname(tempDir), path.basename(tempDir)], {
         timeout: 30000,
+        windowsHide: true,
       });
 
       // Read the archive

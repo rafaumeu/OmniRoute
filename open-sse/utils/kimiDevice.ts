@@ -16,6 +16,7 @@ export function getKimiDeviceModel(): string {
         execFileSync("/usr/bin/sw_vers", ["-productVersion"], {
           encoding: "utf8",
           timeout: 1000,
+          windowsHide: true,
         }).trim() || version;
     } catch {
       // Fall back to the Darwin release when sw_vers is unavailable.

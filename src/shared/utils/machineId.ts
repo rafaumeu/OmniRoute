@@ -41,7 +41,7 @@ function getMachineIdRaw(): string {
       const output = execFileSync(
         regPath,
         ["QUERY", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"],
-        { encoding: "utf8", timeout: 5000 }
+        { encoding: "utf8", timeout: 5000, windowsHide: true }
       );
       const id = output
         .split("REG_SZ")[1]
@@ -64,6 +64,7 @@ function getMachineIdRaw(): string {
     const output = execSync("ioreg -rd1 -c IOPlatformExpertDevice", {
       encoding: "utf8",
       timeout: 5000,
+      windowsHide: true,
     });
     if (output.includes("IOPlatformUUID")) {
       const id = output
@@ -112,7 +113,7 @@ function getMachineIdRaw(): string {
 
   // Strategy 5: execSync("hostname") shell fallback (for constrained environments)
   try {
-    const hostname = execSync("hostname", { encoding: "utf8", timeout: 5000 });
+    const hostname = execSync("hostname", { encoding: "utf8", timeout: 5000, windowsHide: true });
     const id = hostname.trim().toLowerCase();
     if (id) {
       cachedRawId = id;

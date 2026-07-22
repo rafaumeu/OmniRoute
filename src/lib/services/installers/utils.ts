@@ -123,6 +123,7 @@ export function buildNpmExecOptions(
     timeout: options.timeoutMs,
     env,
     maxBuffer: 10 * 1024 * 1024, // 10 MB for npm output
+    windowsHide: true,
   };
   if (platform === "win32") {
     execOptions.shell = true;

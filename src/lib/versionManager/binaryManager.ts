@@ -48,7 +48,7 @@ async function downloadFile(url: string, dest: string, signal?: AbortSignal): Pr
 }
 
 async function extractTarGz(archivePath: string, destDir: string): Promise<void> {
-  await execFileAsync("tar", ["xzf", archivePath, "-C", destDir]);
+  await execFileAsync("tar", ["xzf", archivePath, "-C", destDir], { windowsHide: true });
 }
 
 /**
@@ -83,7 +83,7 @@ export function buildExtractZipCommand(
 
 async function extractZip(archivePath: string, destDir: string): Promise<void> {
   const { command, args } = buildExtractZipCommand(process.platform, archivePath, destDir);
-  await execFileAsync(command, args);
+  await execFileAsync(command, args, { windowsHide: true });
 }
 
 async function verifyChecksum(filePath: string, expectedSha256: string): Promise<boolean> {

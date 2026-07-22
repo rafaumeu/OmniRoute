@@ -539,7 +539,10 @@ async function startMitmInternal(
           );
         }
       } catch (err) {
-        log.error({ err }, "installCertResult threw unexpectedly (continuing without trusted cert)");
+        log.error(
+          { err },
+          "installCertResult threw unexpectedly (continuing without trusted cert)"
+        );
       }
     }
   );
@@ -599,6 +602,7 @@ async function startMitmInternal(
     },
     detached: false,
     stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   });
 
   const proc = serverProcess;

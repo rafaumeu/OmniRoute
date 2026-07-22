@@ -334,6 +334,7 @@ const runProcess = (
     const child = spawn(command, args, {
       env,
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
       // On Windows, npm installs CLI wrappers as .cmd/.bat scripts. Those still
       // need cmd.exe, but direct .exe paths must avoid the shell so paths with
       // spaces are not split before execution.
@@ -469,6 +470,7 @@ const getNpmGlobalPrefix = (): string => {
       timeout: 5000,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
       ...(isWindows() ? { shell: true } : {}),
     });
     const prefix = result.trim();
@@ -874,7 +876,10 @@ const locateCommandCandidate = async (
   // This avoids searching PATH and reduces attack surface
   let bestKnownPathFailure: KnownPathResult | null = null;
   if (toolId) {
-    const { match, bestFailure } = await findKnownPathMatch(getKnownToolPaths(toolId), checkKnownPath);
+    const { match, bestFailure } = await findKnownPathMatch(
+      getKnownToolPaths(toolId),
+      checkKnownPath
+    );
     if (match) {
       return {
         command: commands[0],

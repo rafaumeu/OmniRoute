@@ -209,11 +209,13 @@ export function buildAuggieSpawnOptions(stdio: ["pipe", "pipe", "pipe"]): {
   env: NodeJS.ProcessEnv;
   stdio: ["pipe", "pipe", "pipe"];
   shell: boolean;
+  windowsHide: true;
 } {
   return {
     env: process.env,
     stdio,
     shell: process.platform === "win32",
+    windowsHide: true,
   };
 }
 
@@ -304,6 +306,7 @@ export function checkAuggieCliVersion(timeoutMs = 5000): Promise<AuggieCliVersio
       child = spawn(bin, ["--version"], {
         env: process.env,
         stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
