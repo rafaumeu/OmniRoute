@@ -35,7 +35,7 @@ export function isSudoAvailable(): boolean {
   if (process.platform === "win32") return false;
   try {
     // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
-    execFileSync("sh", ["-c", "command -v sudo"], { stdio: "ignore" });
+    execFileSync("sh", ["-c", "command -v sudo"], { stdio: "ignore", windowsHide: true });
     return true;
   } catch {
     return false;
@@ -44,7 +44,7 @@ export function isSudoAvailable(): boolean {
 
 export function execFileText(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(command, args, { encoding: "utf8" }, (error, stdout, stderr) => {
+    execFile(command, args, { encoding: "utf8", windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
         // Node's execFile already sets error.message to "Command failed: <cmd>"
         // (for non-zero exit) or "spawn <cmd> ENOENT" (for missing binary).
@@ -140,8 +140,10 @@ export function execFileWithPassword(
     // `spawn` is used (not `exec`) so each arg is a separate argv entry and
     // shell metacharacters do not expand. See docs/security/SOCKET_DEV_FINDINGS.md §3.
     // nosemgrep
-    const child = spawn(finalCommand, finalArgs, { // nosemgrep
+    const child = spawn(finalCommand, finalArgs, {
+      // nosemgrep
       stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
     });
     let stdout = "";
     let stderr = "";

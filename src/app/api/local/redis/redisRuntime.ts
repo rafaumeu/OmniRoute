@@ -41,6 +41,6 @@ export async function runRedisRuntimeCommand(
   timeout: number,
   runCommand: ExecFileAsync = execFileAsync
 ) {
-  const { stdout, stderr } = await runCommand(runtime, args, { timeout });
+  const { stdout, stderr } = await runCommand(runtime, args, { timeout, windowsHide: true });
   return { stdout: stdout.trim(), stderr: stderr.trim() };
 }

@@ -155,6 +155,7 @@ export async function POST(req: NextRequest) {
           await execFileAsync("git", ["fetch", "--tags", config.gitRemote], {
             timeout: 60_000,
             cwd: PROJECT_ROOT,
+            windowsHide: true,
           });
           send({ step: "install", status: "done", message: "Tags fetched" });
 
@@ -179,6 +180,7 @@ export async function POST(req: NextRequest) {
             await execFileAsync("git", ["stash", "--include-untracked"], {
               timeout: 30_000,
               cwd: PROJECT_ROOT,
+              windowsHide: true,
             });
           } catch {
             // No local changes to stash.
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
             await execFileAsync("git", ["rev-parse", "--short", "HEAD"], {
               timeout: 10_000,
               cwd: PROJECT_ROOT,
+              windowsHide: true,
             })
           ).stdout.trim();
           const backupBranch = `pre-update/${shortHead}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
@@ -196,6 +199,7 @@ export async function POST(req: NextRequest) {
             await execFileAsync("git", ["branch", backupBranch], {
               timeout: 10_000,
               cwd: PROJECT_ROOT,
+              windowsHide: true,
             });
           } catch {
             // Backup branch is best-effort only.
@@ -204,6 +208,7 @@ export async function POST(req: NextRequest) {
           await execFileAsync("git", ["checkout", resolvedTargetTag], {
             timeout: 30_000,
             cwd: PROJECT_ROOT,
+            windowsHide: true,
           });
           send({ step: "install", status: "done", message: `Checked out ${resolvedTargetTag}` });
 
@@ -223,6 +228,7 @@ export async function POST(req: NextRequest) {
             await execFileAsync("node", ["scripts/dev/sync-env.mjs"], {
               timeout: 15_000,
               cwd: PROJECT_ROOT,
+              windowsHide: true,
             });
           } catch {
             // .env sync is non-fatal during update.
@@ -245,6 +251,7 @@ export async function POST(req: NextRequest) {
             await execFileAsync("pm2", ["restart", "omniroute", "--update-env"], {
               timeout: 30_000,
               cwd: PROJECT_ROOT,
+              windowsHide: true,
             });
             send({ step: "restart", status: "done", message: "Service restarted" });
           } catch {
@@ -301,11 +308,11 @@ export async function POST(req: NextRequest) {
           return;
         }
         send({ step: "install", status: "running", message: `Installing omniroute@${latest}...` });
-          await execFileAsync(
-            "npm",
-            ["install", "-g", `omniroute@${latest}`, "--ignore-scripts", "--legacy-peer-deps"],
-            buildNpmExecOptions(process.platform, { cwd: PROJECT_ROOT, timeoutMs: 300_000 })
-          );
+        await execFileAsync(
+          "npm",
+          ["install", "-g", `omniroute@${latest}`, "--ignore-scripts", "--legacy-peer-deps"],
+          buildNpmExecOptions(process.platform, { cwd: PROJECT_ROOT, timeoutMs: 300_000 })
+        );
         send({ step: "install", status: "done", message: `Installed omniroute@${latest}` });
 
         // Step 2: Rebuild native modules (critical for better-sqlite3)
@@ -324,20 +331,20 @@ export async function POST(req: NextRequest) {
 
         // Step 3: Restart PM2
         send({ step: "restart", status: "running", message: "Restarting service via PM2..." });
-          try {
-            await execFileAsync("pm2", ["restart", "omniroute", "--update-env"], {
-              timeout: 30000,
-              cwd: PROJECT_ROOT,
-            });
-            send({ step: "restart", status: "done", message: "Service restarted" });
-          } catch {
-            // PM2 may not be available (Docker/manual setups)
-            send({
-              step: "restart",
-              status: "skipped",
-              message: "PM2 not available — manual restart needed",
-            });
-          }
+        try {
+          await execFileAsync("pm2", ["restart", "omniroute", "--update-env"], {
+            timeout: 30000,
+            cwd: PROJECT_ROOT,
+          });
+          send({ step: "restart", status: "done", message: "Service restarted" });
+        } catch {
+          // PM2 may not be available (Docker/manual setups)
+          send({
+            step: "restart",
+            status: "skipped",
+            message: "PM2 not available — manual restart needed",
+          });
+        }
 
         send({
           step: "complete",

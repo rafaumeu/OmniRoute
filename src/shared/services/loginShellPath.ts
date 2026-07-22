@@ -69,6 +69,7 @@ export function getLoginShellPath(opts: LoginShellPathOptions = {}): string | nu
         encoding: "utf8",
         timeout: 3000,
         stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
       }));
   try {
     return parseShellPathOutput(run(shell));
