@@ -5,6 +5,7 @@ import {
 } from "../services/geminiThoughtSignatureStore.ts";
 import { normalizeOpenAICompatibleFinishReasonString } from "../utils/finishReason.ts";
 import { containsTextualToolCallMarker } from "../utils/textualToolCall.ts";
+import { stripPlaceholderFromContent } from "../utils/reasoningPlaceholder.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -207,7 +208,7 @@ export function translateNonStreamingResponse(
 
     const message: JsonRecord = { role: "assistant" };
     if (textContent) {
-      message.content = textContent;
+      message.content = stripPlaceholderFromContent(textContent);
     }
     if (reasoningContent) {
       message.reasoning_content = reasoningContent;
@@ -506,7 +507,7 @@ export function translateNonStreamingResponse(
 
       const message: JsonRecord = { role: "assistant" };
       if (textContent) {
-        message.content = textContent;
+        message.content = stripPlaceholderFromContent(textContent);
       }
       if (thinkingContent) {
         message.reasoning_content = thinkingContent;
@@ -561,6 +562,31 @@ export function translateNonStreamingResponse(
 }
 
 /**
+ * Resolve reasoning/thinking text off a non-streaming OpenAI-format message object.
+ * Checks DeepSeek-style `reasoning_content`, then the OpenRouter/StepFun aliases
+ * `reasoning` and `reasoning_details[]` (array of { text | content }), mirroring the
+ * streaming translator's fallback chain in open-sse/translator/response/openai-to-claude.ts.
+ */
+function resolveReasoningText(messageObj: JsonRecord): string {
+  if (messageObj.reasoning_content) {
+    return toString(messageObj.reasoning_content);
+  }
+  if (typeof messageObj.reasoning === "string" && messageObj.reasoning) {
+    return messageObj.reasoning;
+  }
+  if (Array.isArray(messageObj.reasoning_details)) {
+    const parts: string[] = [];
+    for (const detail of messageObj.reasoning_details) {
+      const detailObj = toRecord(detail);
+      const text = detailObj.text ?? detailObj.content;
+      if (typeof text === "string" && text) parts.push(text);
+    }
+    return parts.join("");
+  }
+  return "";
+}
+
+/**
  * Helper to convert an OpenAI chat.completion JSON object to Claude format for non-streaming.
  */
 function convertOpenAINonStreamingToClaude(openaiResponse: JsonRecord): JsonRecord {
@@ -578,11 +604,12 @@ function convertOpenAINonStreamingToClaude(openaiResponse: JsonRecord): JsonReco
 
   let hasTextOrReasoning = false;
 
-  if (messageObj.reasoning_content) {
+  const reasoningText = resolveReasoningText(messageObj);
+  if (reasoningText) {
     hasTextOrReasoning = true;
     content.push({
       type: "thinking",
-      thinking: toString(messageObj.reasoning_content),
+      thinking: reasoningText,
     });
   }
 

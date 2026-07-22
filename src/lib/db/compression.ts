@@ -24,10 +24,13 @@ import {
   type CompressionMode,
   type ContextEditingConfig,
   type EngineToggle,
+  type HeadroomConfig,
   type McpAccessibilityConfig,
   type RtkConfig,
   type UltraConfig,
 } from "@omniroute/open-sse/services/compression/types.ts";
+import { DEFAULT_CONTEXT_BUDGET } from "@omniroute/open-sse/services/compression/adaptiveCompression/types.ts";
+import { normalizeContextBudgetConfig } from "./compressionContextBudget";
 import {
   isPreserveSystemPromptMode,
   normalizePreserveSystemPromptMode,
@@ -43,6 +46,7 @@ const COMPRESSION_MODES = new Set<CompressionMode>([
   "ultra",
   "rtk",
   "stacked",
+  "omniglyph",
 ]);
 
 type JsonRecord = Record<string, unknown>;
@@ -259,8 +263,9 @@ function normalizeContextEditingConfig(value: unknown): ContextEditingConfig {
 }
 
 // Engines allowed in the global stackedPipeline setting. MUST stay in sync with the
-// compression-combo KNOWN_ENGINE_IDS (src/lib/db/compressionCombos.ts) — otherwise the
-// global setting silently strips engines the combo path accepts (B-PIPELINE-DIVERGENCE).
+// compression-combo KNOWN_ENGINE_IDS (src/lib/db/compressionCombos.ts) and with
+// stackedPipelineStepSchema / ENGINE_CATALOG — otherwise the global setting silently
+// strips engines the combo path accepts (B-PIPELINE-DIVERGENCE / #6747).
 const STACKED_PIPELINE_ENGINE_IDS = new Set([
   "lite",
   "caveman",
@@ -271,6 +276,8 @@ const STACKED_PIPELINE_ENGINE_IDS = new Set([
   "session-dedup",
   "ccr",
   "llmlingua",
+  "relevance",
+  "omniglyph",
 ]);
 
 export function normalizeStackedPipeline(value: unknown): CompressionPipelineStep[] {
@@ -417,6 +424,7 @@ const SINGLE_MODE_ENGINE: Partial<Record<CompressionMode, string>> = {
   aggressive: "aggressive",
   ultra: "ultra",
   rtk: "rtk",
+  omniglyph: "omniglyph",
 };
 
 function normalizeEngineToggle(value: unknown): EngineToggle | null {
@@ -426,6 +434,17 @@ function normalizeEngineToggle(value: unknown): EngineToggle | null {
     enabled: record.enabled,
     ...(typeof record.level === "string" ? { level: record.level } : {}),
   };
+}
+
+/** Normalize headroom detail config from DB JSON (#8056). */
+function normalizeHeadroomConfig(value: unknown): HeadroomConfig {
+  const record = toRecord(value);
+  const out: HeadroomConfig = {};
+  if (typeof record.minRows === "number" && Number.isFinite(record.minRows)) {
+    out.minRows = Math.max(2, Math.floor(record.minRows));
+  }
+  if (typeof record.enabled === "boolean") out.enabled = record.enabled;
+  return out;
 }
 
 // Sanitize an engines map for persistence: keep only known engine ids with a well-formed
@@ -545,6 +564,7 @@ export async function getCompressionSettings(): Promise<CompressionConfig> {
     stackedPipeline: normalizeStackedPipeline(undefined),
     aggressive: normalizeAggressiveConfig(undefined),
     ultra: normalizeUltraConfig(undefined),
+    contextBudget: normalizeContextBudgetConfig(undefined),
     contextEditing: { ...DEFAULT_CONTEXT_EDITING_CONFIG },
     engines: {},
     activeComboId: null,
@@ -647,6 +667,12 @@ export async function getCompressionSettings(): Promise<CompressionConfig> {
       case "ultraConfig":
         config.ultra = normalizeUltraConfig(parsed);
         break;
+      case "headroom":
+        config.headroom = normalizeHeadroomConfig(parsed);
+        break;
+      case "contextBudget":
+        config.contextBudget = normalizeContextBudgetConfig(parsed);
+        break;
       case "contextEditing":
         config.contextEditing = normalizeContextEditingConfig(parsed);
         break;
@@ -654,8 +680,7 @@ export async function getCompressionSettings(): Promise<CompressionConfig> {
         storedEngines = parseStoredEnginesMap(parsed);
         break;
       case "activeComboId":
-        config.activeComboId =
-          typeof parsed === "string" && parsed.trim() ? parsed.trim() : null;
+        config.activeComboId = typeof parsed === "string" && parsed.trim() ? parsed.trim() : null;
         break;
       case "ultraEngine":
         // Phase 4 (B): SLM tier selector. Only the two known values; anything else

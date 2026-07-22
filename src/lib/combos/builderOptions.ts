@@ -10,6 +10,7 @@ import {
 import { getAccountDisplayName, getProviderDisplayName } from "@/lib/display/names";
 import { getCompatibleFallbackModels } from "@/lib/providers/managedAvailableModels";
 import { getResolvedModelCapabilities } from "@/lib/modelCapabilities";
+import { CANONICAL_EFFORT_VALUES } from "@/shared/reasoning/effortStandardization";
 import { getSyncedCapabilities } from "@/lib/modelsDevSync";
 import { getModelsByProviderId } from "@/shared/constants/models";
 import {
@@ -86,6 +87,7 @@ export interface ComboBuilderModelOption {
   contextLength?: number;
   outputTokenLimit?: number;
   supportsThinking?: boolean;
+  effortTiers?: string[];
 }
 
 export interface ComboBuilderConnectionOption {
@@ -153,11 +155,6 @@ function toStringArray(value: unknown): string[] | undefined {
     .map((item) => toStringOrNull(item))
     .filter((item): item is string => Boolean(item));
   return normalized.length > 0 ? normalized : undefined;
-}
-
-function isChatCapable(supportedEndpoints: string[] | undefined): boolean {
-  if (!supportedEndpoints || supportedEndpoints.length === 0) return true;
-  return supportedEndpoints.includes("chat");
 }
 
 function getSourcePriority(source: BuilderModelSource): number {
@@ -300,12 +297,12 @@ function addModelOption(
     contextLength?: number | null;
     outputTokenLimit?: number | null;
     supportsThinking?: boolean;
+    effortTiers?: string[] | null;
   }
 ) {
   const modelId = toStringOrNull(input.id);
   if (!modelId) return;
   if (getModelIsHidden(providerId, modelId)) return;
-  if (!isChatCapable(input.supportedEndpoints)) return;
 
   const nextSourcePriority = getSourcePriority(input.source);
   const existing = modelMap.get(modelId);
@@ -326,6 +323,9 @@ function addModelOption(
         : {}),
       ...(typeof input.supportsThinking === "boolean"
         ? { supportsThinking: input.supportsThinking }
+        : {}),
+      ...(Array.isArray(input.effortTiers) && input.effortTiers.length > 0
+        ? { effortTiers: input.effortTiers }
         : {}),
     });
     return;
@@ -354,6 +354,13 @@ function addModelOption(
   }
   if (existing.supportsThinking == null && typeof input.supportsThinking === "boolean") {
     existing.supportsThinking = input.supportsThinking;
+  }
+  if (
+    !Array.isArray(existing.effortTiers) &&
+    Array.isArray(input.effortTiers) &&
+    input.effortTiers.length > 0
+  ) {
+    existing.effortTiers = input.effortTiers;
   }
   existing.sources = Array.from(mergedSources).sort(
     (left, right) => getSourcePriority(left) - getSourcePriority(right)
@@ -385,6 +392,7 @@ function buildModelOptions(
         typeof model.supportsThinking === "boolean"
           ? model.supportsThinking
           : (resolved.supportsThinking ?? undefined),
+      effortTiers: resolved.supportsThinking ? [...CANONICAL_EFFORT_VALUES] : null,
     });
   }
 
@@ -400,6 +408,7 @@ function buildModelOptions(
       contextLength: toNumberOrNull(model.contextLength) ?? resolved.contextWindow,
       outputTokenLimit: resolved.maxOutputTokens,
       supportsThinking: resolved.supportsThinking ?? undefined,
+      effortTiers: resolved.supportsThinking ? [...CANONICAL_EFFORT_VALUES] : null,
     });
   }
 
@@ -426,6 +435,7 @@ function buildModelOptions(
         typeof model.supportsThinking === "boolean"
           ? model.supportsThinking
           : (resolved.supportsThinking ?? undefined),
+      effortTiers: resolved.supportsThinking ? [...CANONICAL_EFFORT_VALUES] : null,
     });
   }
 
@@ -445,11 +455,39 @@ function buildModelOptions(
             : resolved.contextWindow,
         outputTokenLimit: resolved.maxOutputTokens,
         supportsThinking: resolved.supportsThinking ?? undefined,
+        effortTiers: resolved.supportsThinking ? [...CANONICAL_EFFORT_VALUES] : null,
       });
     }
   }
 
+  disambiguateCollidingModelNames(modelMap);
   return modelMap;
+}
+
+/**
+ * #6957: some providers' own catalogs assign the identical display `name` to
+ * several distinct model ids (e.g. Mistral's "codestral-latest" alias renders
+ * under the same upstream name as its base "codestral-2508" model). Since the
+ * builder picker renders `model.name` as the visible option text, two colliding
+ * names make genuinely different models look like duplicates and hide aliases.
+ * Run this after all merge loops have populated `modelMap`: for any name shared
+ * by 2+ distinct ids, fall back every entry in that group to its own `id` as the
+ * display name (display-only — `id`/`qualifiedModel` used for routing untouched).
+ */
+function disambiguateCollidingModelNames(modelMap: Map<string, ComboBuilderModelOption>): void {
+  const idsByName = new Map<string, string[]>();
+  for (const option of modelMap.values()) {
+    const bucket = idsByName.get(option.name) || [];
+    bucket.push(option.id);
+    idsByName.set(option.name, bucket);
+  }
+  for (const [name, ids] of idsByName) {
+    if (ids.length < 2) continue;
+    for (const id of ids) {
+      const option = modelMap.get(id);
+      if (option && option.name === name) option.name = option.id;
+    }
+  }
 }
 
 function compareConnections(

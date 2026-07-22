@@ -25,7 +25,7 @@ import type { QuantumLockConfig, QuantumLockStats } from "./quantumLock/quantumP
 export { ENGINE_IDS };
 
 export type CompressionMode =
-  "off" | "lite" | "standard" | "aggressive" | "ultra" | "rtk" | "stacked";
+  "off" | "lite" | "standard" | "aggressive" | "ultra" | "rtk" | "omniglyph" | "stacked";
 export type CavemanIntensity = "lite" | "full" | "ultra";
 export type RtkIntensity = "minimal" | "standard" | "aggressive";
 export type RtkRawOutputRetention = "never" | "failures" | "always";
@@ -38,7 +38,9 @@ export type CompressionEngineId =
   | "session-dedup"
   | "headroom"
   | "ccr"
-  | "llmlingua";
+  | "llmlingua"
+  | "relevance"
+  | "omniglyph";
 
 export interface CavemanRule {
   name: string;
@@ -235,6 +237,12 @@ export interface CompressionConfig {
   ultraSlmPrewarm?: boolean;
   /** Opt-in result memoization for deterministic engines only (default off). */
   memoizeCompressionResults?: boolean;
+
+  /**
+   * Headroom engine detail config (persisted sub-object, #8056).
+   * On/off + level live in the `engines` map; this stores `minRows`.
+   */
+  headroom?: HeadroomConfig;
 }
 
 export interface CompressionStats {
@@ -404,6 +412,15 @@ export interface AggressiveConfig {
   minSavingsThreshold: number;
   preserveSystemPrompt?: boolean;
 }
+
+/** Headroom engine detail config (#8056) */
+export interface HeadroomConfig {
+  minRows?: number;
+  enabled?: boolean;
+}
+
+/** Default headroom configuration (#8056) */
+export const DEFAULT_HEADROOM_CONFIG: HeadroomConfig = {};
 
 /** Options for the Summarizer interface (Phase 3) */
 export interface SummarizerOpts {
